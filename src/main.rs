@@ -26,9 +26,7 @@ struct Resources<B: gfx_hal::Backend> {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct PushConstants {
-    color: [f32; 4],
-    pos: [f32; 2],
-    scale: [f32; 2],
+    viewport: [i16; 2],
 }
 
 
@@ -70,7 +68,7 @@ impl<B: gfx_hal::Backend> Drop for ResourceHolder<B> {
 }
 
 fn main() {
-    const APP_NAME: &'static str = "Part 1: Drawing a triangle";
+    const APP_NAME: &'static str = "Compute demo";
     const WINDOW_SIZE: [u32; 2] = [512, 512];
 
     let event_loop = winit::event_loop::EventLoop::new();
@@ -234,8 +232,6 @@ fn main() {
         }
     ));
 
-    let start_time = std::time::Instant::now();
-
     // Note that this takes a `move` closure. This means it will take ownership
     // over any resources referenced within. It also means they will be dropped
     // only when the application is quit.
@@ -358,59 +354,6 @@ fn main() {
                     }
                 };
 
-                // This `anim` will be a number that oscillates smoothly
-                // between 0.0 and 1.0.
-                let anim = start_time.elapsed().as_secs_f32().sin() * 0.5 + 0.5;
-
-                let small = [0.33, 0.33];
-
-                let triangles = &[
-                    // Red triangle
-                    PushConstants {
-                        color: [1.0, 0.0, 0.0, 1.0],
-                        pos: [-0.5, -0.5],
-                        scale: small,
-                    },
-                    // Green triangle
-                    PushConstants {
-                        color: [0.0, 1.0, 0.0, 1.0],
-                        pos: [0.0, -0.5],
-                        scale: small,
-                    },
-                    // Blue triangle
-                    PushConstants {
-                        color: [0.0, 0.0, 1.0, 1.0],
-                        pos: [0.5, -0.5],
-                        scale: small,
-                    },
-                    // Blue <-> cyan animated triangle
-                    PushConstants {
-                        color: [0.0, anim, 1.0, 1.0],
-                        pos: [-0.5, 0.5],
-                        scale: small,
-                    },
-                    // Down <-> up animated triangle
-                    PushConstants {
-                        color: [1.0, 1.0, 1.0, 1.0],
-                        pos: [0.0, 0.5 - anim * 0.5],
-                        scale: small,
-                    },
-                    // Small <-> big animated triangle
-                    PushConstants {
-                        color: [1.0, 1.0, 1.0, 1.0],
-                        pos: [0.5, 0.5],
-                        scale: [0.33 + anim * 0.33, 0.33 + anim * 0.33],
-                    },
-                ];
-
-                /// Returns a view of a struct as a slice of `u32`s.
-                unsafe fn push_constant_bytes<T>(push_constants: &T) -> &[u32] {
-                    let size_in_bytes = std::mem::size_of::<T>();
-                    let size_in_u32s = size_in_bytes / std::mem::size_of::<u32>();
-                    let start_ptr = push_constants as *const T as *const u32;
-                    std::slice::from_raw_parts(start_ptr, size_in_u32s)
-                }
-
                 unsafe {
                     use gfx_hal::command::{
                         ClearColor, ClearValue, CommandBuffer, CommandBufferFlags, SubpassContents,
@@ -436,17 +379,30 @@ fn main() {
                     // bind shaders ?and uniforms
                     command_buffer.bind_graphics_pipeline(pipeline);
 
-                    for triangle in triangles {
+                    {
                         use gfx_hal::pso::ShaderStageFlags;
+
+                        // TODO: we keep push constants as they will be used for user events
+                        let push_constants = PushConstants {
+                            viewport: [viewport.rect.w, viewport.rect.h],
+                        };
+
+                        /// Returns a view of a struct as a slice of `u32`s.
+                        unsafe fn push_constant_bytes<T>(push_constants: &T) -> &[u32] {
+                            let size_in_bytes = std::mem::size_of::<T>();
+                            let size_in_u32s = size_in_bytes / std::mem::size_of::<u32>();
+                            let start_ptr = push_constants as *const T as *const u32;
+                            std::slice::from_raw_parts(start_ptr, size_in_u32s)
+                        }
 
                         command_buffer.push_graphics_constants(
                             pipeline_layout,
                             ShaderStageFlags::VERTEX,
                             0,
-                            push_constant_bytes(triangle),
+                            push_constant_bytes(&push_constants),
                         );
 
-                        command_buffer.draw(0..3, 0..1);
+                        command_buffer.draw(0..6, 0..1);
                     }
                     
                     command_buffer.end_render_pass();

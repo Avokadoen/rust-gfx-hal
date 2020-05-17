@@ -2,24 +2,34 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 layout(push_constant) uniform PushConstants {
-    vec4 color;
-    vec2 pos;
-    vec2 scale;
+    vec2 viewport; // unused push constant as we need push constant for later we keep it
 } push_constants;
-
-layout(location = 0) out vec4 vertex_color;
 
 void main() {
     vec2 position;
-    if (gl_VertexIndex == 0) {
-        position = vec2(0.0, -0.5);
-    } else if (gl_VertexIndex == 1) {
-        position = vec2(-0.5, 0.5);
-    } else if (gl_VertexIndex == 2) {
-        position = vec2(0.5, 0.5);
+
+    // For now we can hard code our vertext data as we only care about 1 layer of pixels for texture surface
+    // Branching in this case should be ok because its 6 each frame + branch time should be the same no matter branch outcome
+    switch (gl_VertexIndex) {
+        case 0:
+            position = vec2(-1, -1);
+            break;
+        case 1:
+            position = vec2(-1, 1);
+            break;
+        case 2:
+            position = vec2(1, 1);
+            break;
+        case 3:
+            position = vec2(-1, -1);
+            break;
+        case 4:
+            position = vec2(1, 1);
+            break;
+        case 5:
+            position = vec2(1, -1);
+            break;
     }
     
-    vec2 pos = position * push_constants.scale;
-    vertex_color = push_constants.color;
-    gl_Position = vec4((pos + push_constants.pos), 0.0, 1.0);
+    gl_Position = vec4((position), 0.0, 1.0);
 }
